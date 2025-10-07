@@ -1,3 +1,5 @@
+//Chat GPT help debug
+//reference: https://github.com/flowerflora/MultiplayerGame
 #include "Game.hpp"
 
 #include "Connection.hpp"
@@ -31,6 +33,7 @@ void Player::Controls::send_controls_message(Connection *connection_) const {
 	send_button(up);
 	send_button(down);
 	send_button(jump);
+
 }
 
 bool Player::Controls::recv_controls_message(Connection *connection_) {
@@ -65,6 +68,7 @@ bool Player::Controls::recv_controls_message(Connection *connection_) {
 	recv_button(recv_buffer[4+2], &up);
 	recv_button(recv_buffer[4+3], &down);
 	recv_button(recv_buffer[4+4], &jump);
+	
 
 	//delete message from buffer:
 	recv_buffer.erase(recv_buffer.begin(), recv_buffer.begin() + 4 + size);
@@ -112,12 +116,16 @@ void Game::remove_player(Player *player) {
 
 void Game::update(float elapsed) {
 	//position/velocity update:
+	const float TurnSpeed = 2.5f;  
+    const float DashSpeed = 10.0f;
+	//GPT help debug
 	for (auto &p : players) {
 		glm::vec2 dir = glm::vec2(0.0f, 0.0f);
-		if (p.controls.left.pressed) dir.x -= 1.0f;
-		if (p.controls.right.pressed) dir.x += 1.0f;
-		if (p.controls.down.pressed) dir.y -= 1.0f;
-		if (p.controls.up.pressed) dir.y += 1.0f;
+		if (p.controls.left.pressed)  p.heading += TurnSpeed * elapsed;
+        if (p.controls.right.pressed) p.heading -= TurnSpeed * elapsed;
+		if (p.controls.jump.pressed) {
+            dir = glm::vec2(std::cos(p.heading), std::sin(p.heading));
+        }
 
 		if (dir == glm::vec2(0.0f)) {
 			//no inputs: just drift to a stop
@@ -151,39 +159,73 @@ void Game::update(float elapsed) {
 		p.controls.jump.downs = 0;
 	}
 
+	for (auto &p : players) {
+    p.pp_cd   = std::max(0.0f, p.pp_cd   - elapsed);
+    p.wall_cd = std::max(0.0f, p.wall_cd - elapsed);
+	}
+
 	//collision resolution:
-	for (auto &p1 : players) {
-		//player/player collisions:
-		for (auto &p2 : players) {
-			if (&p1 == &p2) break;
-			glm::vec2 p12 = p2.position - p1.position;
-			float len2 = glm::length2(p12);
-			if (len2 > (2.0f * PlayerRadius) * (2.0f * PlayerRadius)) continue;
-			if (len2 == 0.0f) continue;
+	for (auto itA = players.begin(); itA != players.end(); ++itA) {
+		auto itB = itA; ++itB;
+		for (; itB != players.end(); ++itB) {
+			Player &a = *itA;
+			Player &b = *itB;
+			if (!a.alive || !b.alive) continue;
+
+			glm::vec2 p12 = b.position - a.position;
+			float len2 = glm::dot(p12, p12);
+			float rr_sum = (a.radius + b.radius);
+			if (len2 == 0.0f || len2 > rr_sum * rr_sum) continue;
+
 			glm::vec2 dir = p12 / std::sqrt(len2);
-			//mirror velocity to be in separating direction:
-			glm::vec2 v12 = p2.velocity - p1.velocity;
+
+
+			glm::vec2 v12 = b.velocity - a.velocity;
 			glm::vec2 delta_v12 = dir * glm::max(0.0f, -1.75f * glm::dot(dir, v12));
-			p2.velocity += 0.5f * delta_v12;
-			p1.velocity -= 0.5f * delta_v12;
+			b.velocity += 0.5f * delta_v12;
+			a.velocity -= 0.5f * delta_v12;
+
+			
+			const float HIT_CD = 0.20f;
+			if (a.pp_cd <= 0.0f) { a.hp -= 2; a.pp_cd = HIT_CD; }
+			if (b.pp_cd <= 0.0f) { b.hp -= 2; b.pp_cd = HIT_CD; }
+
+			if (a.hp <= 0 && a.alive) { a.alive = false; a.velocity = glm::vec2(0.0f); }
+			if (b.hp <= 0 && b.alive) { b.alive = false; b.velocity = glm::vec2(0.0f); }
 		}
-		//player/arena collisions:
-		if (p1.position.x < ArenaMin.x + PlayerRadius) {
-			p1.position.x = ArenaMin.x + PlayerRadius;
-			p1.velocity.x = std::abs(p1.velocity.x);
-		}
-		if (p1.position.x > ArenaMax.x - PlayerRadius) {
-			p1.position.x = ArenaMax.x - PlayerRadius;
-			p1.velocity.x =-std::abs(p1.velocity.x);
-		}
-		if (p1.position.y < ArenaMin.y + PlayerRadius) {
-			p1.position.y = ArenaMin.y + PlayerRadius;
-			p1.velocity.y = std::abs(p1.velocity.y);
-		}
-		if (p1.position.y > ArenaMax.y - PlayerRadius) {
-			p1.position.y = ArenaMax.y - PlayerRadius;
-			p1.velocity.y =-std::abs(p1.velocity.y);
-		}
+	}
+
+for (auto &p : players) {
+    if (!p.alive) continue;
+    bool hit_wall = false;
+	//GPT help debug
+    if (p.position.x < ArenaMin.x + p.radius) {
+        p.position.x = ArenaMin.x + p.radius;
+        p.velocity.x =  std::abs(p.velocity.x);
+        hit_wall = true;
+    } else if (p.position.x > ArenaMax.x - p.radius) {
+        p.position.x = ArenaMax.x - p.radius;
+        p.velocity.x = -std::abs(p.velocity.x);
+        hit_wall = true;
+    }
+    if (p.position.y < ArenaMin.y + p.radius) {
+        p.position.y = ArenaMin.y + p.radius;
+        p.velocity.y =  std::abs(p.velocity.y);
+        hit_wall = true;
+    } else if (p.position.y > ArenaMax.y - p.radius) {
+        p.position.y = ArenaMax.y - p.radius;
+        p.velocity.y = -std::abs(p.velocity.y);
+        hit_wall = true;
+    }
+
+    if (hit_wall && p.wall_cd <= 0.0f) {
+        p.hp -= 1;
+        p.wall_cd = 0.15f; 
+        if (p.hp <= 0 && p.alive) {
+            p.alive = false;
+            p.velocity = glm::vec2(0.0f);
+        	}
+    	}
 	}
 
 }

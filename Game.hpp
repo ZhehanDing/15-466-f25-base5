@@ -28,7 +28,7 @@ struct Button {
 struct Player {
 	//player inputs (sent from client):
 	struct Controls {
-		Button left, right, up, down, jump;
+		Button left, right, up, down, jump, reset;
 
 		void send_controls_message(Connection *connection) const;
 
@@ -37,10 +37,19 @@ struct Player {
 		//throws on malformed controls message
 		bool recv_controls_message(Connection *connection);
 	} controls;
-
+	float heading = 0.0f; 
+    float dash_cd = 0.0f;   
+	bool  cd_active = false;  
+    bool  dash_ready = true;  
+    bool  was_jump_pressed = false; 
 	//player state (sent from server):
 	glm::vec2 position = glm::vec2(0.0f, 0.0f);
 	glm::vec2 velocity = glm::vec2(0.0f, 0.0f);
+	int   hp = 10;          // orginal blood
+    bool  alive = true;     // survive
+    float pp_cd = 3.0f;     // damage cool down
+    float wall_cd = 3.0f;   // hit cool down
+	float radius = 0.12f;
 
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
 	std::string name = "";
@@ -68,7 +77,7 @@ struct Game {
 	inline static constexpr glm::vec2 ArenaMax = glm::vec2( 0.75f,  1.0f);
 
 	//player constants:
-	inline static constexpr float PlayerRadius = 0.06f;
+	inline static constexpr float PlayerRadius = 0.12f;
 	inline static constexpr float PlayerSpeed = 2.0f;
 	inline static constexpr float PlayerAccelHalflife = 0.25f;
 	
