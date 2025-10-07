@@ -26,7 +26,8 @@ This game was built with [NEST](NEST.md).
 
 Several BUGs didn't fix:
 
-Can't freeze game when hp<=0
-Pressing R didn't reset player location
-When hp<0 seal will run out of the map
-Hitting logical still need to improve
+Can't freeze game when hp<=0,
+Pressing R didn't reset player location, 
+When hp<0 seal will run out of the map, 
+Hitting logical still need to improve, 
+Sea didn't shows with proper color, lack of mesh generation.
