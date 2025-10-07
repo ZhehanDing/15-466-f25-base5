@@ -1,4 +1,4 @@
-# Bouncing seal
+# Seal Smash
 
 Author: Alex Ding
 
